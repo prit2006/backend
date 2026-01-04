@@ -1,20 +1,16 @@
-const express = require("express")
-const app = express();
-const port = 3000;
-app.get("/user", (req, res) => {
-    res.send("Prit Pastagiya")
+app.use("/admin", (req, res, next) => {
+    const token = "999";
+    const isAuthorizedAdmin = token === "999";
+    if (!isAuthorizedAdmin) {
+        res.status(401).send("Unauthorized Admin")
+    } else {
+        next();
+    }
 })
-app.post("/user", (req, res) => {
-    res.send("Post request on user")    
+app.get("/admin/getAllData", (req, res) => {
+    res.send("All data Generated")
 })
-app.use("/test", (req, res) => {
-    res.send("Server started!")
+app.get("/admin/deleteData", (req, res) => {
+    res.send("Data Deleted")
 })
-
-app.use("/main", (req, res) => {
-    res.send("another route")
-})
-
-app.listen(port, () => {
-    console.log("Server started running on port " + port)
-})
+app.listen(3000, () => console.log('Server is running on port 3000'));
