@@ -1,19 +1,25 @@
-const adminAuth=(req, res, next) =>{
-    const token = "999";
-    const isAuthorizedAdmin = token === "999";
-    if (!isAuthorizedAdmin) {
-        res.status(401).send("Unauthorized Admin");
-    } else {
+const jwt = require("jsonwebtoken");
+const User = require("../models/user");
+
+const userAuth=async (req, res, next) =>{
+
+    try {
+        const token = req.cookies.token;
+        if (!token) {
+           throw new Error("No token provided.");
+        }
+        const decoded = await jwt.verify(token, "Prit@2006");
+        const _id = decoded.userId;
+        const user = await User.findById(_id);
+        if (!user) {
+            throw new Error("User not found.");
+        }
+        req.user = user;       
         next();
+    } catch (err) {
+        res.status(401).send("Authentication failed: " + err.message);
     }
+
+
 }
-const userAuth=(req, res, next) =>{
-    const token = "123";
-    const isAuthorizedUser = token === "123";
-    if (!isAuthorizedUser) {
-        res.status(401).send("Unauthorized User");      
-    } else {
-        next();
-    }
-}
-module.exports={adminAuth, userAuth};
+module.exports={userAuth};
