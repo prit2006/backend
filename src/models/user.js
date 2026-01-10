@@ -1,3 +1,57 @@
+const mongoose = require("mongoose");
+const validator = require("validator");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+
+
+const userSchema = new mongoose.Schema({
+  firstname: { type: String, required: true },
+  lastname: { type: String, required: true },
+
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    validate: {
+      validator: (value) => validator.isEmail(value),
+      message: "Invalid email format"
+    }
+  },
+
+  pass: {
+    type: String,
+    required: true,
+    validate: {
+      validator: (value) => validator.isStrongPassword(value),
+      message: "Password is not strong enough"
+    }
+  },
+
+  age: { type: Number, min: 0 },
+
+  gender: {
+    type: String,
+    enum: ["Male", "Female", "Other"]
+  }
+});
+
+userSchema.methods.getJwtToken = function() {
+  const user = this;
+  const token= jwt.sign({ userId: this._id }, "Prit@2006", { expiresIn: "7d" });
+  return token;
+};
+
+userSchema.methods.validatePassword = function(pass) {
+  const user = this;
+  const passhash = user.pass;
+  const ispassvalid = bcrypt.compare(pass, passhash);
+  return ispassvalid;
+};
+
+
+module.exports = mongoose.model("User", userSchema);
+
+
 // const mongoose = require('mongoose');
 // const validator = require('validator');
 
@@ -37,40 +91,3 @@
 // const User = mongoose.model('User', userSchema);
 
 // module.exports = User;
-
-
-const mongoose = require("mongoose");
-const validator = require("validator");
-
-const userSchema = new mongoose.Schema({
-  firstname: { type: String, required: true },
-  lastname: { type: String, required: true },
-
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    validate: {
-      validator: (value) => validator.isEmail(value),
-      message: "Invalid email format"
-    }
-  },
-
-  pass: {
-    type: String,
-    required: true,
-    validate: {
-      validator: (value) => validator.isStrongPassword(value),
-      message: "Password is not strong enough"
-    }
-  },
-
-  age: { type: Number, min: 0 },
-
-  gender: {
-    type: String,
-    enum: ["Male", "Female", "Other"]
-  }
-});
-
-module.exports = mongoose.model("User", userSchema);

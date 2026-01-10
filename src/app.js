@@ -62,14 +62,14 @@ app.post("/login", async (req, res) => {
         if (!user) {
             throw new Error("User not found");
         }
-        const isPasswordMatch = await bcrypt.compare(pass, user.pass);
+        const isPasswordMatch = await user.validatePassword(pass);
         if (!isPasswordMatch) {
             throw new Error("Incorrect password");
         }
         // res.send("Login successful");
         // create a jwt token here for better security
 
-        const token = jwt.sign({ userId: user._id }, "Prit@2006", { expiresIn: "1h" });
+        const token = user.getJwtToken();
         // console.log("Generated JWT Token:", token);
         res.cookie("token",token, { httpOnly: true });
         const Loginuser = await User.findOne({ email: email });
