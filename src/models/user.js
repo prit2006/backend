@@ -5,7 +5,16 @@ const userSchema = new mongoose.Schema({
   lastname: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   age: { type: Number, min: 0 },
-  gender: { type: String, enum: ['Male', 'Female', 'Other'] }
+  gender: { 
+    type: String, 
+    enum: ['Male', 'Female', 'Other'],
+    validate: {
+      validator: function(value) {
+        return ['Male', 'Female', 'Other'].includes(value);
+      },
+      message: 'Gender must be Male, Female, or Other.'
+    }
+  }
 });
 
 
