@@ -5,33 +5,91 @@ const connectDB = require("./config/database")
 const {adminAuth,userAuth} = require("./middlewares/auth")
 const User = require("./models/user")
 app.use(express.json());
+const { validatesignupdata } = require("./utilt/validation");
+const bcrypt = require("bcrypt");
 
 
-app.post("/signup", (req, res) => { 
-    console.log(req.body);
-    // const userobj={
-    //     firstname:"Prit",
-    //     lastname:"Pastagiya",
-    //     email:"Prit@gmail.com",
-    //     pass:"Prit"
-    //     }
-  
 
-    // {
-    //     "firstname":"1Prit",
-    //     "lastname":"1Pastagiya",
-    //     "email":"1Prit@gmail.com",
-    //     "pass":"1Prit"
-    // }
-        const user = new User(req.body);
-        user.save()
-        .then(() => {
-            res.send("User Signed Up Successfully")
-        })
-        .catch((err) => {
-            res.status(500).send("Error signing up user: " + err.message);
-        });
-    })
+app.post("/signup", async (req, res) => {
+  try {
+    //  Validate input
+    validatesignupdata(req);
+
+    //  Correctly get password
+    const pass = req.body.pass;
+
+    // Hash password
+    const bcryptedPassword = await bcrypt.hash(pass, 10);
+    console.log("Encrypted Password:", bcryptedPassword);
+
+    // Create user
+    const user = new User({
+      firstname: req.body.firstname,
+      lastname: req.body.lastname,
+      email: req.body.email,
+      pass: bcryptedPassword,
+      age: req.body.age,
+      gender: req.body.gender
+    });
+
+    // Save to DB
+    await user.save();
+
+    res.status(201).send("User Signed Up Successfully");
+  } catch (err) {
+    res.status(400).send(err.message);
+  }
+});
+
+app.post("/login", async (req, res) => {
+    const { email, pass } = req.body;
+    try {
+        const user = await User.findOne({ email: email });
+        if (!user) {
+            throw new Error("User not found");
+        }
+        const isPasswordMatch = await bcrypt.compare(pass, user.pass);
+        if (!isPasswordMatch) {
+            throw new Error("Incorrect password");
+        }
+        res.send("Login successful");
+        const Loginuser = await User.findOne({ email: email });
+        console.log(Loginuser);
+    } catch (err) {
+        res.status(500).send("Error logging in: " + err.message);
+    }
+});
+
+
+// app.post("/signup", (req, res) => { 
+//     console.log(req.body);
+//     // const userobj={
+//     //     firstname:"Prit",
+//     //     lastname:"Pastagiya",
+//     //     email:"Prit@gmail.com",
+//     //     pass:"Prit"
+//     //     }
+//     // {
+//     //     "firstname":"1Prit",
+//     //     "lastname":"1Pastagiya",
+//     //     "email":"1Prit@gmail.com",
+//     //     "pass":"1Prit"
+//     // }
+//     try {
+//         const ISvalid= validatesignupdata(req);
+//         console.log("Validation passed"+ ISvalid);
+//         const user = new User(req.body);
+//         user.save()
+//         .then(() => {
+//             res.send("User Signed Up Successfully")
+//         })
+//         .catch((err) => {
+//             res.status(500).send("Error signing up user: " + err.message);
+//         });
+//     } catch (err) {
+//         res.status(400).send("Validation Error: " + err.message);   
+//     }
+//     })
 
 app.get("/user", async (req, res) => {
     const email = req.body.email;
@@ -141,25 +199,3 @@ connectDB()
 }); 
 
 
-// app.use("/",(err, req, res, next) => {
-//   console.error(err.stack); 
-//   res.status(500).send('Something went wrong!');
-// });
-
-// app.post("/user", userAuth, (req, res) => {
-//     res.send("User Created")
-// })  
-
-// app.get("/user/info", userAuth, (req, res) => {
-//     res.send("Prit Pastagiya")
-// })
-
-// app.use("/admin", adminAuth)
-
-// app.get("/admin/getAllData", (req, res) => {
-//     res.send("All data Generated")
-// })
-
-// app.get("/admin/deleteData", (req, res) => {
-//     res.send("Data Deleted")
-// })
