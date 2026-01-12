@@ -3,9 +3,7 @@ const authrouter = express.Router();
 const User = require('../models/user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { validatesignupdata } = require('../utilt/validation');
-
-
+const { validatesignupdata } = require('../util/validation');
 
 authrouter.post("/signup", async (req, res) => {
   try {
@@ -61,6 +59,11 @@ authrouter.post("/login", async (req, res) => {
     } catch (err) {
         res.status(500).send("Error logging in: " + err.message);
     }
+});
+
+authrouter.post("/logout", (req, res) => {
+    res.clearCookie("token");
+    res.send("User logged out successfully");
 });
 
 module.exports = authrouter;
