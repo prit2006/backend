@@ -4,6 +4,7 @@ const User = require('../models/user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { validatesignupdata } = require('../util/validation');
+const { userAuth } = require('../middlewares/auth');
 
 authrouter.post("/signup", async (req, res) => {
   try {
@@ -24,7 +25,8 @@ authrouter.post("/signup", async (req, res) => {
       email: req.body.email,
       pass: bcryptedPassword,
       age: req.body.age,
-      gender: req.body.gender
+      gender: req.body.gender,
+      skills: req.body.skills
     });
 
     // Save to DB
@@ -61,9 +63,10 @@ authrouter.post("/login", async (req, res) => {
     }
 });
 
-authrouter.post("/logout", (req, res) => {
+authrouter.post("/logout",userAuth, (req, res) => {
+    const {firstname, lastname} = req.user;
     res.clearCookie("token");
-    res.send("User logged out successfully");
+    res.send(`${firstname} ${lastname} logged out successfully`);
 });
 
 module.exports = authrouter;

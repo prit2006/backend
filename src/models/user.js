@@ -3,7 +3,6 @@ const validator = require("validator");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
-
 const userSchema = new mongoose.Schema({
   firstname: { type: String, required: true },
   lastname: { type: String, required: true },
@@ -32,25 +31,28 @@ const userSchema = new mongoose.Schema({
   gender: {
     type: String,
     enum: ["Male", "Female", "Other"]
+  },
+
+  skills: {
+    type: [String],
+    default: []
   }
 });
 
-userSchema.methods.getJwtToken = function() {
-  const user = this;
-  const token= jwt.sign({ userId: this._id }, "Prit@2006", { expiresIn: "7d" });
+userSchema.methods.getJwtToken = function () {
+  const token = jwt.sign(
+    { userId: this._id },
+    "Prit@2006",
+    { expiresIn: "7d" }
+  );
   return token;
 };
 
-userSchema.methods.validatePassword = function(pass) {
-  const user = this;
-  const passhash = user.pass;
-  const ispassvalid = bcrypt.compare(pass, passhash);
-  return ispassvalid;
+userSchema.methods.validatePassword = function (pass) {
+  return bcrypt.compare(pass, this.pass);
 };
 
-
 module.exports = mongoose.model("User", userSchema);
-
 
 // const mongoose = require('mongoose');
 // const validator = require('validator');

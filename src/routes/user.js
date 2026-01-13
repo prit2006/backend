@@ -92,7 +92,7 @@ userrouter.patch("/:userId",userAuth, async (req, res) => {
     const updateduser = req.body;
     console.log(updateduser);
     try {
-        const allowedUpdates = ['firstname', 'lastname', 'email', 'age', 'gender'];
+        const allowedUpdates = ['firstname', 'lastname', 'email', 'age', 'gender','skills'];
         const updates = Object.keys(updateduser);
         const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
         if (!isValidOperation) {
@@ -108,6 +108,61 @@ userrouter.patch("/:userId",userAuth, async (req, res) => {
         res.status(500).send("Error updating user: " + err.message);
     }
 });
+// userrouter.patch("/skills", userAuth, async (req, res) => {
+//   try {
+//     const userId = req.user._id;
+//     console.log(userId);
+//     const { skills } = req.body;
+//     console.log(skills);
+//     if (!Array.isArray(skills)) {
+//       return res.status(400).json({ message: "Skills must be an array" });
+//     }
+//     const user = await User.findById(userId);
+//     console.log(user);
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+//     user.skills = skills;
+//     await user.save();
+//     console.log(user.skills);
+//     res.status(200).json({ message: "Skills updated successfully", skills: user.skills });
+
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+userrouter.post("/skills", userAuth, async (req, res) => {
+  try {
+    const { skills } = req.body;
+
+    if (!Array.isArray(skills)) {
+      return res.status(400).json({ error: "Skills must be an array" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,   
+      {
+        $addToSet: {
+          skills: { $each: skills }
+        }
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: "Skills updated successfully",
+      skills: user.skills
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 
 module.exports = userrouter;
 
