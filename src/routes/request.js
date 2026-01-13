@@ -9,7 +9,7 @@ requestrouter.post("/send/:status/:receiveruserId", userAuth, async (req, res) =
     const senderId = req.user._id;
     const receiverId = req.params.receiveruserId;
     const status = req.params.status;
-    
+
     //this will be checked by the pre save hook in model
     // if (senderId.toString() === receiverId) {
     //   return res.status(400).json({ message: "You cannot send a request to yourself" });
@@ -73,5 +73,40 @@ requestrouter.post("/send/:status/:receiveruserId", userAuth, async (req, res) =
   }
 });
 
+requestrouter.post("/review/:status/:senderId", userAuth, async (req, res) => {
+  try {
+    const { status, senderId } = req.params;
+    const receiverId = req.user._id;
+
+    const allowedStatuses = ["accepted", "rejected"];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ message: "Invalid status value" });
+    }
+
+    const connectionRequests = await ConnectionRequest.findOne({
+      senderId: senderId,
+      receiverId: receiverId,
+      status: "interested"
+    });     
+
+    if (!connectionRequests) {
+      return res.status(404).json({ message: "No pending connection request found from this user" });
+    }
+
+    connectionRequests.status = status;;
+    const updatedRequest = await connectionRequests.save();
+
+    res.status(200).json({
+      message: `Connection request ${status} successfully`,
+      data: updatedRequest
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      message: "Error fetching connection requests",
+      error: err.message
+    });
+  }
+});
 
 module.exports = requestrouter;

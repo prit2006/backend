@@ -5,6 +5,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { validatesignupdata } = require('../util/validation');
 const { userAuth } = require('../middlewares/auth');
+const mongoose = require('mongoose');
+const ConnectionRequest = require('../models/connectionrequest');
 
 
 userrouter.get("/",userAuth, async (req, res) => {
@@ -23,9 +25,10 @@ userrouter.get("/",userAuth, async (req, res) => {
     }
 });
 
-userrouter.get("/feed",userAuth, async  (req, res) => {
+userrouter.get("/getall",userAuth, async  (req, res) => {
     try {
-        const users =await User.find();
+        //me not include myself in the list
+        const users = await User.find({ _id: { $ne: req.user._id } });
         if (users.length === 0) {
             return res.status(404).send("No users found");
         }   else{
@@ -108,29 +111,7 @@ userrouter.patch("/:userId",userAuth, async (req, res) => {
         res.status(500).send("Error updating user: " + err.message);
     }
 });
-// userrouter.patch("/skills", userAuth, async (req, res) => {
-//   try {
-//     const userId = req.user._id;
-//     console.log(userId);
-//     const { skills } = req.body;
-//     console.log(skills);
-//     if (!Array.isArray(skills)) {
-//       return res.status(400).json({ message: "Skills must be an array" });
-//     }
-//     const user = await User.findById(userId);
-//     console.log(user);
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-//     user.skills = skills;
-//     await user.save();
-//     console.log(user.skills);
-//     res.status(200).json({ message: "Skills updated successfully", skills: user.skills });
 
-//   } catch (err) {
-//     res.status(500).json({ error: err.message });
-//   }
-// });
 userrouter.post("/skills", userAuth, async (req, res) => {
   try {
     const { skills } = req.body;
@@ -162,7 +143,127 @@ userrouter.post("/skills", userAuth, async (req, res) => {
   }
 });
 
+userrouter.delete("/skills/:userId", userAuth, async (req, res) => {
+  try {
+    const userId = req.params?.userId;
+    const { skills } = req.body;
+    if (!Array.isArray(skills)) {
+      return res.status(400).json({ error: "Skills must be an array" });
+    }
 
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        $pull: {
+          skills: { $in: skills }
+        }
+      },
+      { new: true }
+    );
 
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: "Skills removed successfully",
+      skills: user.skills
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+userrouter.get("/requests/received",userAuth,async (req,res)=>
+{
+    try{
+    const userId = req.user._id;
+    const requests = await ConnectionRequest.find({ receiverId: userId ,status: "interested"}).populate('senderId', 'firstname lastname email age gender skills');
+    if(requests.length===0){
+        res.status(404).json({ message: "No requests found" }); 
+    }
+    res.json(requests);
+    }catch(err)
+    {
+        res.status(500).json({ error: err.message });
+    }
+
+});
+
+userrouter.get("/connection",userAuth,async (req,res)=>
+{
+    try{
+    const userId = req.user._id;
+    const requests = await ConnectionRequest.find(
+        { $or: [
+            { senderId: userId, status: "accepted" },
+            { receiverId: userId, status: "accepted" }
+        ]
+    }).populate('senderId receiverId', 'firstname lastname email age gender skills');
+    if(requests.length===0){
+        res.status(404).json({ message: "No accepted requests found" });
+    }
+    const data = requests.map(request => {
+        return {
+            connectionWith: request.senderId._id.equals(userId) ? request.receiverId : request.senderId,
+            connectedAt: request.updatedAt
+        };
+    });
+    res.json(data);
+    }catch(err)
+    {
+        res.status(500).json({ error: err.message });
+    }
+
+});
+userrouter.get("/feed",userAuth, async  (req, res) => {
+    try {
+     //   user dont want to see themselves in feed and also those who are ignored or rejected by them
+        // const allUsers =await User.find({_id: { $ne: req.user._id } });
+        // if (allUsers.length === 0) {
+        //     return res.status(404).send("No users found");
+        // } 
+        // const ignoredOrRejectedIds = await ConnectionRequest.find({ 
+        //     senderId: req.user._id, 
+        //     status: { $in: ["ignored", "rejected", "accepted", "interested"] } 
+        // }).distinct('receiverId');
+        // const users = await User.find({
+        //     _id: { $nin: [req.user._id, ...ignoredOrRejectedIds] }
+        // });
+        // res.json({ users });
+
+        const receiveruserId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 10;
+        if (limit > 100) limit = 100; // Max limit to 100
+        const skip = (page - 1) * limit;
+        
+        const connectionRequest = await ConnectionRequest.find({
+            $or: [
+                { senderId: receiveruserId },
+                { receiverId: receiveruserId }
+            ]
+        }).select('senderId receiverId status').populate('senderId receiverId', 'firstname lastname ');
+       
+        const hideuserfromfeed = new Set();
+        connectionRequest.forEach(request => {
+            hideuserfromfeed.add(request.senderId._id.toString());
+            hideuserfromfeed.add(request.receiverId._id.toString());
+        });
+        hideuserfromfeed.add(receiveruserId.toString());
+        console.log(hideuserfromfeed);
+
+       // users = await User.find({   _id: { $nin: Array.from(hideuserfromfeed) } });
+       const users = await User.find({ $and: [ { _id: { $ne: receiveruserId } }, 
+        { _id: { $nin: Array.from(hideuserfromfeed) } } ] }).skip(skip).limit(limit);
+        if(users.length === 0) {
+            return res.status(404).send("No users found for feed");
+        }
+        hideuserfromfeed.clear();
+        res.json(users);
+    } catch (err) {
+        res.status(500).send("Error fetching users: " + err.message);
+    }
+});
 module.exports = userrouter;
 

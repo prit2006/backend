@@ -52,6 +52,25 @@ userSchema.methods.validatePassword = function (pass) {
   return bcrypt.compare(pass, this.pass);
 };
 
+userSchema.pre("findOneAndUpdate", function () {
+  const update = this.getUpdate();
+
+  // Handle $addToSet + $each
+  if (update?.$addToSet?.skills?.$each) {
+    update.$addToSet.skills.$each = [
+      ...new Set(update.$addToSet.skills.$each)
+    ];
+  }
+
+  // Handle direct skills replacement
+  if (update.skills && Array.isArray(update.skills)) {
+    update.skills = [...new Set(update.skills)];
+  }
+
+  this.setUpdate(update);
+});
+
+
 module.exports = mongoose.model("User", userSchema);
 
 // const mongoose = require('mongoose');
