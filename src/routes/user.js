@@ -95,7 +95,7 @@ userrouter.patch("/:userId",userAuth, async (req, res) => {
     const updateduser = req.body;
     console.log(updateduser);
     try {
-        const allowedUpdates = ['firstname', 'lastname', 'email', 'age', 'gender','skills'];
+        const allowedUpdates = ['firstname', 'lastname', 'email', 'age', 'gender','skills','photoURL'];
         const updates = Object.keys(updateduser);
         const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
         if (!isValidOperation) {

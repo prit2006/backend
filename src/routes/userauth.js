@@ -26,7 +26,8 @@ authrouter.post("/signup", async (req, res) => {
       pass: bcryptedPassword,
       age: req.body.age,
       gender: req.body.gender,
-      skills: req.body.skills
+      skills: req.body.skills,
+      photoURL:req.body.photoURL
     });
 
     // Save to DB
@@ -57,7 +58,8 @@ authrouter.post("/login", async (req, res) => {
         res.cookie("token",token, { httpOnly: true });
         const Loginuser = await User.findOne({ email: email });
         // console.log(Loginuser);
-        res.send(Loginuser);
+        // res.send("Login succesfull");
+        res.send(user)
     } catch (err) {
         res.status(500).send("Error logging in: " + err.message);
     }

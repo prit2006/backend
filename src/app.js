@@ -13,9 +13,20 @@ const authrouter = require("./routes/userauth");
 const profilerouter = require("./routes/profile");
 const userrouter = require("./routes/user");
 const requestrouter = require("./routes/request");
+const cors = require("cors");
 
+// app.use(cors())
 app.use(express.json());
 app.use(cookieParser());
+
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 connectDB()
 .then(() => {
