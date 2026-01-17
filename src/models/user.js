@@ -40,6 +40,10 @@ const userSchema = new mongoose.Schema({
 
   photoURL: {
     type: String
+  },
+  about:
+  {
+    type: String
   }
 });
 

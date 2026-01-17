@@ -18,7 +18,7 @@ const validatesignupdata = (req) => {
 };
 
 const validateeditprofiledata = (req) => {
-const allowedits = ['firstname', 'lastname', 'email', 'age', 'gender']
+const allowedits = ['firstname', 'lastname', 'email', 'age', 'gender','skills','photoURL','about']
 Object.keys(req.body).forEach((key) => {
     if (!allowedits.includes(key)) {
         throw new Error(`Invalid field: ${key}`);
