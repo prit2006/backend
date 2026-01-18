@@ -178,7 +178,7 @@ userrouter.get("/requests/received",userAuth,async (req,res)=>
 {
     try{
     const userId = req.user._id;
-    const requests = await ConnectionRequest.find({ receiverId: userId ,status: "interested"}).populate('senderId', 'firstname lastname email age gender skills');
+    const requests = await ConnectionRequest.find({ receiverId: userId ,status: "interested"}).populate('senderId', 'firstname lastname email age gender skills photoURL about');
     if(requests.length===0){
         res.status(404).json({ message: "No requests found" }); 
     }
@@ -199,9 +199,9 @@ userrouter.get("/connection",userAuth,async (req,res)=>
             { senderId: userId, status: "accepted" },
             { receiverId: userId, status: "accepted" }
         ]
-    }).populate('senderId receiverId', 'firstname lastname email age gender skills');
+    }).populate('senderId receiverId', 'firstname lastname email age gender skills photoURL about');
     if(requests.length===0){
-        res.status(404).json({ message: "No accepted requests found" });
+       return  res.status(404).json({ message: "No accepted requests found" });
     }
     const data = requests.map(request => {
         return {
