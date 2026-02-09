@@ -13,6 +13,7 @@ const authrouter = require("./routes/userauth");
 const profilerouter = require("./routes/profile");
 const userrouter = require("./routes/user");
 const requestrouter = require("./routes/request");
+const postRouter = require("./routes/post");
 const cors = require("cors");
 
 // app.use(cors())
@@ -55,3 +56,5 @@ app.use("/profile", profilerouter);
 app.use("/request", requestrouter);
 
 app.use("/user", userrouter)
+
+app.use("/post", postRouter);
