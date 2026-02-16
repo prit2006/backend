@@ -12,6 +12,7 @@ const mongoose = require("mongoose");
 const authrouter = require("./routes/userauth");
 const profilerouter = require("./routes/profile");
 const userrouter = require("./routes/user");
+const projectRouter = require("./routes/project");
 const requestrouter = require("./routes/request");
 const postRouter = require("./routes/post");
 const cors = require("cors");
@@ -28,14 +29,6 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-// app.use(cors({
-//   origin: "http://localhost:5173",
-//   credentials: true,
-//   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-//   allowedHeaders: ["Content-Type", "Authorization"]
-// }));
-
-// app.options("*", cors());
 
 connectDB()
 .then(() => {
@@ -58,3 +51,14 @@ app.use("/request", requestrouter);
 app.use("/user", userrouter)
 
 app.use("/post", postRouter);
+
+app.use("/project", projectRouter);
+
+// app.use(cors({
+//   origin: "http://localhost:5173",
+//   credentials: true,
+//   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+//   allowedHeaders: ["Content-Type", "Authorization"]
+// }));
+
+// app.options("*", cors());
