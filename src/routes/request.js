@@ -1,8 +1,9 @@
 const express = require('express');
 const requestrouter = express.Router();
-const { userAuth } = require('../middlewares/auth'); 
+const { userAuth } = require('../middlewares/auth');
 const ConnectionRequest = require('../models/connectionrequest');
 const User = require('../models/user');
+const Notification = require('../models/notification');
 
 requestrouter.post("/send/:status/:receiveruserId", userAuth, async (req, res) => {
   try {
@@ -14,7 +15,7 @@ requestrouter.post("/send/:status/:receiveruserId", userAuth, async (req, res) =
     // if (senderId.toString() === receiverId) {
     //   return res.status(400).json({ message: "You cannot send a request to yourself" });
     // }
-    
+
     const senderuser = await User.findById(senderId);
     const receiveruser = await User.findById(receiverId);
 
@@ -35,16 +36,16 @@ requestrouter.post("/send/:status/:receiveruserId", userAuth, async (req, res) =
     });
 
     if (existingRequest) {
-        if(existingRequest.status==="interested"){
-      return res.status(400).json({
-        message: `Connection already exists between ${senderuser.firstname} ${senderuser.lastname} and ${receiveruser.firstname} ${receiveruser.lastname}`
-      });
-    } else{
-      return res.status(400).json({
-        message: `You have already ignored ${receiveruser.firstname} ${receiveruser.lastname}`
-    });
+      if (existingRequest.status === "interested") {
+        return res.status(400).json({
+          message: `Connection already exists between ${senderuser.firstname} ${senderuser.lastname} and ${receiveruser.firstname} ${receiveruser.lastname}`
+        });
+      } else {
+        return res.status(400).json({
+          message: `You have already ignored ${receiveruser.firstname} ${receiveruser.lastname}`
+        });
+      }
     }
-}
 
     const connectionRequest = new ConnectionRequest({
       senderId,
@@ -53,17 +54,26 @@ requestrouter.post("/send/:status/:receiveruserId", userAuth, async (req, res) =
     });
 
     const data = await connectionRequest.save();
-    if(status==="interested"){
-    res.status(201).json({
-      message: `${senderuser.firstname} ${senderuser.lastname} sent request to ${receiveruser.firstname} ${receiveruser.lastname}`,
-      data
-    });
-    }else{
-    res.status(201).json({
-      message: `${senderuser.firstname} ${senderuser.lastname} ignored ${receiveruser.firstname} ${receiveruser.lastname}`,
-      data
-    });
-}
+
+    if (status === "interested") {
+      // Create a notification for the receiver
+      await Notification.create({
+        receiverId,
+        senderId,
+        type: "CONNECTION_REQUEST",
+        message: `${senderuser.firstname} ${senderuser.lastname} sent you a connection request.`,
+      });
+
+      res.status(201).json({
+        message: `${senderuser.firstname} ${senderuser.lastname} sent request to ${receiveruser.firstname} ${receiveruser.lastname}`,
+        data
+      });
+    } else {
+      res.status(201).json({
+        message: `${senderuser.firstname} ${senderuser.lastname} ignored ${receiveruser.firstname} ${receiveruser.lastname}`,
+        data
+      });
+    }
 
   } catch (err) {
     res.status(500).json({
@@ -87,7 +97,7 @@ requestrouter.post("/review/:status/:senderId", userAuth, async (req, res) => {
       senderId: senderId,
       receiverId: receiverId,
       status: "interested"
-    });     
+    });
 
     if (!connectionRequests) {
       return res.status(404).json({ message: "No pending connection request found from this user" });
@@ -95,6 +105,17 @@ requestrouter.post("/review/:status/:senderId", userAuth, async (req, res) => {
 
     connectionRequests.status = status;;
     const updatedRequest = await connectionRequests.save();
+
+    if (status === "accepted") {
+      const myself = req.user;
+      // Notify the sender that their request was accepted
+      await Notification.create({
+        receiverId: senderId,
+        senderId: receiverId,
+        type: "REQUEST_ACCEPTED",
+        message: `${myself.firstname} ${myself.lastname} accepted your connection request.`,
+      });
+    }
 
     res.status(200).json({
       message: `Connection request ${status} successfully`,
@@ -110,3 +131,116 @@ requestrouter.post("/review/:status/:senderId", userAuth, async (req, res) => {
 });
 
 module.exports = requestrouter;
+
+// const express = require('express');
+// const requestrouter = express.Router();
+// const { userAuth } = require('../middlewares/auth'); 
+// const ConnectionRequest = require('../models/connectionrequest');
+// const User = require('../models/user');
+
+// requestrouter.post("/send/:status/:receiveruserId", userAuth, async (req, res) => {
+//   try {
+//     const senderId = req.user._id;
+//     const receiverId = req.params.receiveruserId;
+//     const status = req.params.status;
+
+//     //this will be checked by the pre save hook in model
+//     // if (senderId.toString() === receiverId) {
+//     //   return res.status(400).json({ message: "You cannot send a request to yourself" });
+//     // }
+    
+//     const senderuser = await User.findById(senderId);
+//     const receiveruser = await User.findById(receiverId);
+
+//     if (!senderuser || !receiveruser) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     const allowedstatus = ["interested", "ignored"];
+//     if (!allowedstatus.includes(status)) {
+//       return res.status(400).json({ message: "Invalid status value" });
+//     }
+
+//     const existingRequest = await ConnectionRequest.findOne({
+//       $or: [
+//         { senderId: senderId, receiverId: receiverId },
+//         { senderId: receiverId, receiverId: senderId }
+//       ]
+//     });
+
+//     if (existingRequest) {
+//         if(existingRequest.status==="interested"){
+//       return res.status(400).json({
+//         message: `Connection already exists between ${senderuser.firstname} ${senderuser.lastname} and ${receiveruser.firstname} ${receiveruser.lastname}`
+//       });
+//     } else{
+//       return res.status(400).json({
+//         message: `You have already ignored ${receiveruser.firstname} ${receiveruser.lastname}`
+//     });
+//     }
+// }
+
+//     const connectionRequest = new ConnectionRequest({
+//       senderId,
+//       receiverId,
+//       status
+//     });
+
+//     const data = await connectionRequest.save();
+//     if(status==="interested"){
+//     res.status(201).json({
+//       message: `${senderuser.firstname} ${senderuser.lastname} sent request to ${receiveruser.firstname} ${receiveruser.lastname}`,
+//       data
+//     });
+//     }else{
+//     res.status(201).json({
+//       message: `${senderuser.firstname} ${senderuser.lastname} ignored ${receiveruser.firstname} ${receiveruser.lastname}`,
+//       data
+//     });
+// }
+
+//   } catch (err) {
+//     res.status(500).json({
+//       message: "Error sending interest",
+//       error: err.message
+//     });
+//   }
+// });
+
+// requestrouter.post("/review/:status/:senderId", userAuth, async (req, res) => {
+//   try {
+//     const { status, senderId } = req.params;
+//     const receiverId = req.user._id;
+
+//     const allowedStatuses = ["accepted", "rejected"];
+//     if (!allowedStatuses.includes(status)) {
+//       return res.status(400).json({ message: "Invalid status value" });
+//     }
+
+//     const connectionRequests = await ConnectionRequest.findOne({
+//       senderId: senderId,
+//       receiverId: receiverId,
+//       status: "interested"
+//     });     
+
+//     if (!connectionRequests) {
+//       return res.status(404).json({ message: "No pending connection request found from this user" });
+//     }
+
+//     connectionRequests.status = status;;
+//     const updatedRequest = await connectionRequests.save();
+
+//     res.status(200).json({
+//       message: `Connection request ${status} successfully`,
+//       data: updatedRequest
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({
+//       message: "Error fetching connection requests",
+//       error: err.message
+//     });
+//   }
+// });
+
+// module.exports = requestrouter;
