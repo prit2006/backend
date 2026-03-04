@@ -17,6 +17,7 @@ const requestrouter = require("./routes/request");
 const postRouter = require("./routes/post");
 const notificationRouter = require("./routes/notification");
 const bookmarkRouter = require("./routes/bookmark");
+const adminRouter = require("./routes/admin");
 const cors = require("cors");
 
 // app.use(cors())
@@ -60,6 +61,8 @@ app.use("/notification", notificationRouter);
 
 app.use("/bookmark", bookmarkRouter);
 
+app.use("/admin", adminRouter);
+
 // const express = require("express")
 // const app = express();
 // const port = 3000;
@@ -101,7 +104,7 @@ app.use("/bookmark", bookmarkRouter);
 // })
 // .catch((err) => {
 //     console.error("Database connection error:", err);
-// }); 
+// });
 
 
 // app.use("/auth", authrouter);
