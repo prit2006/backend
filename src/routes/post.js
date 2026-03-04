@@ -120,6 +120,43 @@ postRouter.post("/comment/:postId", userAuth, async (req, res) => {
   }
 });
 
+/* ---------------- EDIT POST ---------------- */
+postRouter.patch("/edit/:postId", userAuth, async (req, res) => {
+  try {
+    const { title, content, imgURL } = req.body;
+    const { postId } = req.params;
+
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // ownership check
+    if (post.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized to edit this post" });
+    }
+
+    post.title = title || post.title;
+    post.content = content || post.content;
+    post.imgURL = imgURL || post.imgURL;
+
+    await post.save();
+
+    const updatedPost = await Post.findById(postId)
+      .populate("userId", "firstname lastname photoURL")
+      .populate("comments.userId", "firstname lastname photoURL");
+
+    res.json({
+      message: "Post updated successfully",
+      post: updatedPost
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ---------------- EDIT COMMENT ---------------- */
 postRouter.patch("/comment/:postId/:commentId", userAuth, async (req, res) => {
   try {

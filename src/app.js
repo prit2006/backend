@@ -18,6 +18,7 @@ const postRouter = require("./routes/post");
 const notificationRouter = require("./routes/notification");
 const bookmarkRouter = require("./routes/bookmark");
 const adminRouter = require("./routes/admin");
+const paymentRouter = require("./routes/payment");
 const cors = require("cors");
 
 // app.use(cors())
@@ -62,6 +63,8 @@ app.use("/notification", notificationRouter);
 app.use("/bookmark", bookmarkRouter);
 
 app.use("/admin", adminRouter);
+
+app.use("/", paymentRouter);
 
 // const express = require("express")
 // const app = express();

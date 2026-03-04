@@ -60,7 +60,14 @@ const userSchema = new mongoose.Schema({
   ],
   savedProjects: [
     { type: mongoose.Schema.Types.ObjectId, ref: "Project" }
-  ]
+  ],
+  isPremium: {
+    type: Boolean,
+    default: false, 
+  },
+  membershipType: {
+    type: String
+  }
 });
 
 userSchema.methods.getJwtToken = function () {
