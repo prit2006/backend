@@ -19,7 +19,16 @@ const notificationRouter = require("./routes/notification");
 const bookmarkRouter = require("./routes/bookmark");
 const adminRouter = require("./routes/admin");
 const paymentRouter = require("./routes/payment");
+const  intializeSocket  = require("./util/socket");
+const chatRouter = require("./routes/chat");
 const cors = require("cors");
+
+const http = require("http");
+const server = http.createServer(app);
+intializeSocket(server);
+
+
+
 
 // app.use(cors())
 app.use(express.json());
@@ -37,7 +46,7 @@ app.use(
 connectDB()
   .then(() => {
     console.log("Database connected successfully");
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log("Server started running on port " + port)
     })
   })
@@ -65,6 +74,8 @@ app.use("/bookmark", bookmarkRouter);
 app.use("/admin", adminRouter);
 
 app.use("/", paymentRouter);
+
+app.use("/", chatRouter);
 
 // const express = require("express")
 // const app = express();
