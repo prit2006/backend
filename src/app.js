@@ -19,8 +19,9 @@ const notificationRouter = require("./routes/notification");
 const bookmarkRouter = require("./routes/bookmark");
 const adminRouter = require("./routes/admin");
 const paymentRouter = require("./routes/payment");
-const  intializeSocket  = require("./util/socket");
+const intializeSocket = require("./util/socket");
 const chatRouter = require("./routes/chat");
+const jobRouter = require("./routes/job");
 const cors = require("cors");
 
 const http = require("http");
@@ -76,6 +77,8 @@ app.use("/admin", adminRouter);
 app.use("/", paymentRouter);
 
 app.use("/", chatRouter);
+
+app.use("/job", jobRouter);
 
 // const express = require("express")
 // const app = express();

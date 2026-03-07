@@ -5,20 +5,69 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { validatesignupdata } = require('../util/validation');
 const { userAuth } = require('../middlewares/auth');
+const upload = require("../middlewares/upload");
+const cloudinary = require("../config/cloudinary");
 
-authrouter.post("/signup", async (req, res) => {
+// authrouter.post("/signup", async (req, res) => {
+//   try {
+//     //  Validate input
+//     validatesignupdata(req);
+
+//     //  Correctly get password
+//     const pass = req.body.pass;
+
+//     // Hash password
+//     const bcryptedPassword = await bcrypt.hash(pass, 10);
+//     //console.log("Encrypted Password:", bcryptedPassword);
+
+//     // Create user
+//     const user = new User({
+//       firstname: req.body.firstname,
+//       lastname: req.body.lastname,
+//       email: req.body.email,
+//       pass: bcryptedPassword,
+//       age: req.body.age,
+//       gender: req.body.gender,
+//       skills: req.body.skills,
+//       photoURL: req.body.photoURL
+//     });
+
+//     // Save to DB
+//     await user.save();
+
+//     res.status(201).send("User Signed Up Successfully");
+//   } catch (err) {
+//     res.status(400).send(err.message);
+//   }
+// });
+authrouter.post("/signup", upload.single("photo"), async (req, res) => {
   try {
-    //  Validate input
+
     validatesignupdata(req);
 
-    //  Correctly get password
     const pass = req.body.pass;
 
-    // Hash password
     const bcryptedPassword = await bcrypt.hash(pass, 10);
-    //console.log("Encrypted Password:", bcryptedPassword);
 
-    // Create user
+    let photoURL = "";
+
+    // Upload image to Cloudinary
+    if (req.file) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "devswipe_profiles" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+      });
+
+      photoURL = result.secure_url;
+    }
+
     const user = new User({
       firstname: req.body.firstname,
       lastname: req.body.lastname,
@@ -27,13 +76,13 @@ authrouter.post("/signup", async (req, res) => {
       age: req.body.age,
       gender: req.body.gender,
       skills: req.body.skills,
-      photoURL: req.body.photoURL
+      photoURL: photoURL
     });
 
-    // Save to DB
     await user.save();
 
     res.status(201).send("User Signed Up Successfully");
+
   } catch (err) {
     res.status(400).send(err.message);
   }

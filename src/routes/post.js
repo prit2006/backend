@@ -4,12 +4,39 @@ const { userAuth } = require("../middlewares/auth");
 const Post = require("../models/post");
 const ConnectionRequest = require("../models/connectionrequest");
 const Notification = require("../models/notification");
+const upload = require("../middlewares/upload");
+const cloudinary = require("../config/cloudinary");
 
 /* ---------------- CREATE POST ---------------- */
-postRouter.post("/create", userAuth, async (req, res) => {
+postRouter.post("/create", userAuth, upload.single("image"), async (req, res) => {
   try {
-    const { title, content, imgURL } = req.body;
-    if (!title) return res.status(400).json({ message: "Title is required" });
+
+    const { title, content } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ message: "Title is required" });
+    }
+
+    let imgURL = "";
+
+    if (req.file) {
+
+      const result = await new Promise((resolve, reject) => {
+
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "devswipe_posts" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+
+      });
+
+      imgURL = result.secure_url;
+    }
 
     const post = new Post({
       userId: req.user._id,
@@ -19,11 +46,34 @@ postRouter.post("/create", userAuth, async (req, res) => {
     });
 
     await post.save();
-    res.status(201).json({ message: "Post created successfully", post });
+
+    res.status(201).json({
+      message: "Post created successfully",
+      post
+    });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+// postRouter.post("/create", userAuth, async (req, res) => {
+//   try {
+//     const { title, content, imgURL } = req.body;
+//     if (!title) return res.status(400).json({ message: "Title is required" });
+
+//     const post = new Post({
+//       userId: req.user._id,
+//       title,
+//       content,
+//       imgURL
+//     });
+
+//     await post.save();
+//     res.status(201).json({ message: "Post created successfully", post });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
 /* ---------------- FEED (NON PAGINATED) ---------------- */
 postRouter.get("/feed", userAuth, async (req, res) => {
@@ -121,9 +171,10 @@ postRouter.post("/comment/:postId", userAuth, async (req, res) => {
 });
 
 /* ---------------- EDIT POST ---------------- */
-postRouter.patch("/edit/:postId", userAuth, async (req, res) => {
+postRouter.patch("/edit/:postId", userAuth, upload.single("image"), async (req, res) => {
   try {
-    const { title, content, imgURL } = req.body;
+
+    const { title, content } = req.body;
     const { postId } = req.params;
 
     const post = await Post.findById(postId);
@@ -132,14 +183,31 @@ postRouter.patch("/edit/:postId", userAuth, async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // ownership check
     if (post.userId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Not authorized to edit this post" });
     }
 
+    if (req.file) {
+
+      const result = await new Promise((resolve, reject) => {
+
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "devswipe_posts" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+
+      });
+
+      post.imgURL = result.secure_url;
+    }
+
     post.title = title || post.title;
     post.content = content || post.content;
-    post.imgURL = imgURL || post.imgURL;
 
     await post.save();
 
@@ -156,6 +224,41 @@ postRouter.patch("/edit/:postId", userAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// postRouter.patch("/edit/:postId", userAuth, async (req, res) => {
+//   try {
+//     const { title, content, imgURL } = req.body;
+//     const { postId } = req.params;
+
+//     const post = await Post.findById(postId);
+
+//     if (!post) {
+//       return res.status(404).json({ message: "Post not found" });
+//     }
+
+//     // ownership check
+//     if (post.userId.toString() !== req.user._id.toString()) {
+//       return res.status(403).json({ message: "Not authorized to edit this post" });
+//     }
+
+//     post.title = title || post.title;
+//     post.content = content || post.content;
+//     post.imgURL = imgURL || post.imgURL;
+
+//     await post.save();
+
+//     const updatedPost = await Post.findById(postId)
+//       .populate("userId", "firstname lastname photoURL")
+//       .populate("comments.userId", "firstname lastname photoURL");
+
+//     res.json({
+//       message: "Post updated successfully",
+//       post: updatedPost
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
 /* ---------------- EDIT COMMENT ---------------- */
 postRouter.patch("/comment/:postId/:commentId", userAuth, async (req, res) => {

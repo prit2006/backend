@@ -4,30 +4,78 @@ const { userAuth } = require("../middlewares/auth");
 const { isConnected } = require("../util/checkConnection");
 const mongoose = require("mongoose");
 const { validatesignupdata } = require("../util/validation");
-
 const projectRouter = express.Router();
 const ConnectionRequest = require("../models/connectionrequest");
-
+const upload = require("../middlewares/upload");
+const cloudinary = require("../config/cloudinary");
 
 /**
  * CREATE PROJECT
  * Only allowed if requester is connected (accepted) with himself (always true)
  */
-projectRouter.post("/create", userAuth, async (req, res) => {
-  try {
-    const project = await Project.create({
-      ...req.body,
-      ownerId: req.user._id,
-    });
 
-    res.status(201).json({
-      message: "Project created successfully",
-      project,
-    });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+projectRouter.post(
+  "/create",
+  userAuth,
+  upload.array("images"),
+  async (req, res) => {
+    try {
+
+      let imageUrls = [];
+
+      if (req.files) {
+
+        for (const file of req.files) {
+
+          const result = await new Promise((resolve, reject) => {
+
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "devswipe_projects" },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              }
+            );
+
+            stream.end(file.buffer);
+
+          });
+
+          imageUrls.push(result.secure_url);
+        }
+      }
+
+      const project = await Project.create({
+        ...req.body,
+        ownerId: req.user._id,
+        websiteImages: imageUrls,
+      });
+
+      res.status(201).json({
+        message: "Project created successfully",
+        project,
+      });
+
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
   }
-});
+);
+// projectRouter.post("/create", userAuth, async (req, res) => {
+//   try {
+//     const project = await Project.create({
+//       ...req.body,
+//       ownerId: req.user._id,
+//     });
+
+//     res.status(201).json({
+//       message: "Project created successfully",
+//       project,
+//     });
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// });
 
 /**
  * GET MY PROJECTS
@@ -75,42 +123,122 @@ projectRouter.delete("/:projectId", userAuth, async (req, res) => {
 /**
  * UPDATE PROJECT (owner only)
  */
-projectRouter.patch("/:projectId", userAuth, async (req, res) => {
-  try {
-    const allowedUpdates = [
-      "header",
-      "description",
-      "githubURL",
-      "deployURL",
-      "websiteImages",
-      "techStack",
-      "isPublic",
-    ];
-    
-    const updates = Object.keys(req.body);
-    const isValidOperation = updates.every((update) =>
-      allowedUpdates.includes(update)
-    );
+projectRouter.patch(
+  "/:projectId",
+  userAuth,
+  upload.array("images"),
+  async (req, res) => {
+    try {
 
-    if (!isValidOperation) {
-      return res.status(400).json({ error: "Invalid updates" });
+      const allowedUpdates = [
+        "header",
+        "description",
+        "githubURL",
+        "deployURL",
+        "techStack",
+        "isPublic",
+      ];
+
+      const updates = {};
+
+      allowedUpdates.forEach((field) => {
+        if (req.body[field] !== undefined) {
+          updates[field] = req.body[field];
+        }
+      });
+
+      // convert techStack to array
+      if (req.body.techStack) {
+        updates.techStack = Array.isArray(req.body.techStack)
+          ? req.body.techStack
+          : [req.body.techStack];
+      }
+
+      // Upload new images to Cloudinary
+      let imageUrls = [];
+
+      if (req.files && req.files.length > 0) {
+
+        for (const file of req.files) {
+
+          const result = await new Promise((resolve, reject) => {
+
+            const stream = cloudinary.uploader.upload_stream(
+              { folder: "devswipe_projects" },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              }
+            );
+
+            stream.end(file.buffer);
+
+          });
+
+          imageUrls.push(result.secure_url);
+        }
+      }
+
+      if (imageUrls.length > 0) {
+        updates.$push = { websiteImages: { $each: imageUrls } };
+      }
+
+      const project = await Project.findOneAndUpdate(
+        { _id: req.params.projectId, ownerId: req.user._id },
+        updates,
+        { new: true }
+      );
+
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      res.json({
+        message: "Project updated successfully",
+        project,
+      });
+
+    } catch (err) {
+      res.status(400).json({ error: err.message });
     }
-
-    const project = await Project.findOneAndUpdate(
-      { _id: req.params.projectId, ownerId: req.user._id },
-      req.body,
-      { new: true, runValidators: true }
-    );
-
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
-    }
-
-    res.json({ message: "Project updated successfully", project });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
   }
-});
+);
+// projectRouter.patch("/:projectId", userAuth, async (req, res) => {
+//   try {
+//     const allowedUpdates = [
+//       "header",
+//       "description",
+//       "githubURL",
+//       "deployURL",
+//       "websiteImages",
+//       "techStack",
+//       "isPublic",
+//     ];
+    
+//     const updates = Object.keys(req.body);
+//     const isValidOperation = updates.every((update) =>
+//       allowedUpdates.includes(update)
+//     );
+
+//     if (!isValidOperation) {
+//       return res.status(400).json({ error: "Invalid updates" });
+//     }
+
+//     const project = await Project.findOneAndUpdate(
+//       { _id: req.params.projectId, ownerId: req.user._id },
+//       req.body,
+//       { new: true, runValidators: true }
+//     );
+
+//     if (!project) {
+//       return res.status(404).json({ message: "Project not found" });
+//     }
+
+//     res.json({ message: "Project updated successfully", project });
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// });
 
 /**
  * GET SINGLE PROJECT (owner or connected user)
@@ -544,29 +672,67 @@ projectRouter.get("/search/tech", userAuth, async (req, res) => {
 /**
  * ADD IMAGE TO PROJECT (owner only)
  */
-projectRouter.post("/:projectId/images", userAuth, async (req, res) => {
-  try {
-    const { imageUrl } = req.body;
+projectRouter.post(
+  "/:projectId/images",
+  userAuth,
+  upload.single("image"),
+  async (req, res) => {
+    try {
 
-    if (!imageUrl) {
-      return res.status(400).json({ message: "Image URL required" });
+      if (!req.file) {
+        return res.status(400).json({ message: "Image required" });
+      }
+
+      const result = await new Promise((resolve, reject) => {
+
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "devswipe_projects" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+
+      });
+
+      const project = await Project.findOneAndUpdate(
+        { _id: req.params.projectId, ownerId: req.user._id },
+        { $push: { websiteImages: result.secure_url } },
+        { new: true }
+      );
+
+      res.json({ message: "Image added", project });
+
+    } catch (err) {
+      res.status(400).json({ error: err.message });
     }
-
-    const project = await Project.findOneAndUpdate(
-      { _id: req.params.projectId, ownerId: req.user._id },
-      { $push: { websiteImages: imageUrl } },
-      { new: true }
-    );
-
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
-    }
-
-    res.json({ message: "Image added successfully", project });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
   }
-});
+);
+// projectRouter.post("/:projectId/images", userAuth, async (req, res) => {
+//   try {
+//     const { imageUrl } = req.body;
+
+//     if (!imageUrl) {
+//       return res.status(400).json({ message: "Image URL required" });
+//     }
+
+//     const project = await Project.findOneAndUpdate(
+//       { _id: req.params.projectId, ownerId: req.user._id },
+//       { $push: { websiteImages: imageUrl } },
+//       { new: true }
+//     );
+
+//     if (!project) {
+//       return res.status(404).json({ message: "Project not found" });
+//     }
+
+//     res.json({ message: "Image added successfully", project });
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// });
 
 /**
  * REMOVE IMAGE FROM PROJECT (owner only)

@@ -4,6 +4,9 @@ const { adminAuth } = require("../middlewares/auth");
 const User = require("../models/user");
 const Post = require("../models/post");
 const Project = require("../models/project");
+const Job = require("../models/job");
+const Application = require("../models/application");
+const nodemailer = require("nodemailer");
 
 // GET /admin/stats
 adminRouter.get("/stats", adminAuth, async (req, res) => {
@@ -141,6 +144,107 @@ adminRouter.delete("/projects/:id", adminAuth, async (req, res) => {
         const project = await Project.findByIdAndDelete(req.params.id);
         if (!project) return res.status(404).send("Project not found");
         res.json({ message: "Project deleted successfully" });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// POST /admin/jobs
+adminRouter.post("/jobs", adminAuth, async (req, res) => {
+    try {
+        const { title, company, role, skills, description, eligibility, deadline } = req.body;
+        const job = new Job({ title, company, role, skills, description, eligibility, deadline });
+        await job.save();
+        res.status(201).json(job);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// GET /admin/jobs
+adminRouter.get("/jobs", adminAuth, async (req, res) => {
+    try {
+        const jobs = await Job.find().sort({ createdAt: -1 });
+        res.json(jobs);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// DELETE /admin/jobs/:id
+adminRouter.delete("/jobs/:id", adminAuth, async (req, res) => {
+    try {
+        const job = await Job.findByIdAndDelete(req.params.id);
+        if (!job) return res.status(404).send("Job not found");
+        await Application.deleteMany({ jobId: req.params.id });
+        res.json({ message: "Job deleted successfully" });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// GET /admin/applications
+adminRouter.get("/applications", adminAuth, async (req, res) => {
+    try {
+        const applications = await Application.find()
+            .populate("userId", "firstname lastname email photoURL")
+            .populate("jobId", "title company role")
+            .sort({ createdAt: -1 });
+        res.json(applications);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// PATCH /admin/applications/:id/verify
+adminRouter.patch("/applications/:id/verify", adminAuth, async (req, res) => {
+    try {
+
+        const application = await Application.findByIdAndUpdate(
+            req.params.id,
+            { status: "verified" },
+            { returnDocument: "after" }   // ✅ FIX
+        )
+        .populate("userId", "firstname lastname email")
+        .populate("jobId", "title company");
+
+        if (!application) {
+            return res.status(404).send("Application not found");
+        }
+
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: "pritpastagiya2006@gmail.com",
+                pass: "aiizxilblnwswcer"
+            }
+        });
+
+        const mailOptions = {
+            from: "DevSwipe <pritpastagiya2006@gmail.com>",
+            to: application.userId.email,
+            subject: `Congratulations! You have been selected for ${application.jobId.title}`,
+            text: `
+Dear ${application.userId.firstname},
+
+Congratulations!
+
+Your application for the role of ${application.jobId.title} at ${application.jobId.company} has been verified by our admin.
+
+You may be contacted by the company soon.
+
+Best Regards,
+DevSwipe Team
+`
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.json({
+            message: "Application verified and email sent",
+            application
+        });
+
     } catch (err) {
         res.status(500).send(err.message);
     }

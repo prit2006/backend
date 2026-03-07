@@ -5,7 +5,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { userAuth } = require('../middlewares/auth');
 const { validatesignupdata , validateeditprofiledata , validatepasswordchange} = require('../util/validation');
-
+const upload = require("../middlewares/upload");
+const cloudinary = require("../config/cloudinary");
 
 
 profilerouter.get("/", userAuth ,async (req, res) => {
@@ -21,25 +22,47 @@ profilerouter.get("/", userAuth ,async (req, res) => {
     }
 });
 
-profilerouter.patch("/edit", userAuth ,async (req, res) => {
-    try {
-        const Isupade = validateeditprofiledata(req);
-        if(!Isupade){
-            throw new Error("Invalid data for update");
-        }
-        const user = req.user;  
-        const updates = req.body;
+profilerouter.patch("/edit", userAuth, upload.single("photo"), async (req, res) => {
+  try {
 
-        Object.keys(updates).forEach((key) => {
-            user[key] = updates[key];
-        });
+    const user = req.user;
 
-        await user.save();
-        res.send(user);
-    } catch (err) {
-        res.status(500).send("Error updating profile: " + err.message);
+    if (req.file) {
+
+      const result = await new Promise((resolve, reject) => {
+
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "devswipe_profiles" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+
+      });
+
+      user.photoURL = result.secure_url;
     }
 
+    if (req.body.firstname) user.firstname = req.body.firstname;
+    if (req.body.lastname) user.lastname = req.body.lastname;
+    if (req.body.age) user.age = req.body.age;
+    if (req.body.gender) user.gender = req.body.gender;
+    if (req.body.about) user.about = req.body.about;
+
+    if (req.body.skills) {
+      user.skills = JSON.parse(req.body.skills);
+    }
+
+    await user.save();
+
+    res.send(user);
+
+  } catch (err) {
+    res.status(500).send("Error updating profile: " + err.message);
+  }
 });
  
 profilerouter.delete("/delete", userAuth ,async (req, res) => {
