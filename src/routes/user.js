@@ -257,6 +257,7 @@ userrouter.get("/feed", userAuth, async (req, res) => {
   try {
     const receiverUserId = req.user._id;
 
+    // Pagination
     const page = parseInt(req.query.page) || 1;
     let limit = parseInt(req.query.limit) || 10;
 
@@ -264,6 +265,7 @@ userrouter.get("/feed", userAuth, async (req, res) => {
 
     const skip = (page - 1) * limit;
 
+    // Find all connection requests (sent + received)
     const connectionRequests = await ConnectionRequest.find({
       $or: [
         { senderId: receiverUserId },
@@ -271,28 +273,49 @@ userrouter.get("/feed", userAuth, async (req, res) => {
       ],
     }).select("senderId receiverId");
 
+    // Store users to hide
     const hideUsers = new Set();
 
-    connectionRequests.forEach((req) => {
-      hideUsers.add(req.senderId.toString());
-      hideUsers.add(req.receiverId.toString());
+    connectionRequests.forEach((reqItem) => {
+      hideUsers.add(reqItem.senderId.toString());
+      hideUsers.add(reqItem.receiverId.toString());
     });
 
+    // Also hide current user
     hideUsers.add(receiverUserId.toString());
 
+    // Fetch users excluding:
+    // - self
+    // - already connected/requested users
+    // - admin users
+    // - inactive users
     const users = await User.find({
       _id: { $nin: Array.from(hideUsers) },
+      role: { $ne: "admin" },     // ❗ exclude admin
+      status: "active",           // ❗ only active users
     })
+      .select("-pass") // ❗ hide password field
       .skip(skip)
       .limit(limit);
 
     if (users.length === 0) {
-      return res.status(404).send("No users found for feed");
+      return res.status(404).json({
+        message: "No users found for feed",
+      });
     }
 
-    return res.json(users);
+    return res.status(200).json({
+      page,
+      count: users.length,
+      users,
+    });
+
   } catch (err) {
-    return res.status(500).send("Error fetching users: " + err.message);
+    console.error(err);
+    return res.status(500).json({
+      message: "Error fetching users",
+      error: err.message,
+    });
   }
 });
 

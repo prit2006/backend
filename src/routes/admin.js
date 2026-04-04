@@ -6,6 +6,7 @@ const Post = require("../models/post");
 const Project = require("../models/project");
 const Job = require("../models/job");
 const Application = require("../models/application");
+const Payment = require("../models/payment");
 const nodemailer = require("nodemailer");
 
 // GET /admin/stats
@@ -245,6 +246,135 @@ DevSwipe Team
             application
         });
 
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// ─── PAYMENT MANAGEMENT ──────────────────────────────────────────────────────
+
+// GET /admin/payments - List all payments with user info, supports status filter & search
+adminRouter.get("/payments", adminAuth, async (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.status) filter.status = req.query.status;
+        if (req.query.search) {
+            const regex = { $regex: req.query.search, $options: "i" };
+            filter.$or = [
+                { orderId: regex },
+                { paymentId: regex },
+                { receipt: regex },
+                { "notes.membershipType": regex }
+            ];
+        }
+        const payments = await Payment.find(filter)
+            .populate("userId", "firstname lastname email photoURL isPremium membershipType")
+            .sort({ createdAt: -1 });
+        const totalRevenue = await Payment.aggregate([
+            { $match: { status: "captured" } },
+            { $group: { _id: null, total: { $sum: "$amount" } } }
+        ]);
+        const statusCounts = await Payment.aggregate([
+            { $group: { _id: "$status", count: { $sum: 1 } } }
+        ]);
+        const membershipCounts = await Payment.aggregate([
+            { $group: { _id: "$notes.membershipType", count: { $sum: 1 }, revenue: { $sum: "$amount" } } }
+        ]);
+        res.json({
+            payments,
+            stats: {
+                totalRevenue: totalRevenue[0]?.total || 0,
+                statusCounts,
+                membershipCounts
+            }
+        });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// GET /admin/payments/:id - Get single payment detail
+adminRouter.get("/payments/:id", adminAuth, async (req, res) => {
+    try {
+        const payment = await Payment.findById(req.params.id)
+            .populate("userId", "firstname lastname email photoURL isPremium membershipType");
+        if (!payment) return res.status(404).send("Payment not found");
+        res.json(payment);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// PATCH /admin/payments/:id/status - Update payment status
+adminRouter.patch("/payments/:id/status", adminAuth, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const allowed = ["created", "captured", "failed", "refunded"];
+        if (!allowed.includes(status)) {
+            return res.status(400).json({ message: `Status must be one of: ${allowed.join(", ")}` });
+        }
+        const payment = await Payment.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true }
+        ).populate("userId", "firstname lastname email photoURL");
+        if (!payment) return res.status(404).send("Payment not found");
+
+        // Sync user premium status when payment is captured or refunded
+        if (status === "captured") {
+            await User.findByIdAndUpdate(payment.userId._id, {
+                isPremium: true,
+                membershipType: payment.notes?.membershipType || "silver"
+            });
+        } else if (status === "refunded" || status === "failed") {
+            // Check if user has another captured payment before revoking
+            const otherCaptured = await Payment.findOne({
+                userId: payment.userId._id,
+                status: "captured",
+                _id: { $ne: payment._id }
+            });
+            if (!otherCaptured) {
+                await User.findByIdAndUpdate(payment.userId._id, {
+                    isPremium: false,
+                    membershipType: "free"
+                });
+            }
+        }
+        res.json(payment);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// PATCH /admin/payments/:id/extend - Extend / upgrade membership type
+adminRouter.patch("/payments/:id/extend", adminAuth, async (req, res) => {
+    try {
+        const { membershipType, extendMonths } = req.body;
+        const payment = await Payment.findById(req.params.id).populate("userId", "firstname lastname email");
+        if (!payment) return res.status(404).send("Payment not found");
+
+        if (membershipType) {
+            payment.notes = { ...payment.notes, membershipType };
+            await payment.save();
+            // Update user membership too
+            await User.findByIdAndUpdate(payment.userId._id, { membershipType });
+        }
+
+        res.json({
+            message: `Membership ${ membershipType ? `updated to ${membershipType}` : "" }${ extendMonths ? ` extended by ${extendMonths} month(s)` : "" }`,
+            payment
+        });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// DELETE /admin/payments/:id - Delete a payment record
+adminRouter.delete("/payments/:id", adminAuth, async (req, res) => {
+    try {
+        const payment = await Payment.findByIdAndDelete(req.params.id);
+        if (!payment) return res.status(404).send("Payment not found");
+        res.json({ message: "Payment deleted successfully" });
     } catch (err) {
         res.status(500).send(err.message);
     }
