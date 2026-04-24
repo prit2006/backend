@@ -67,13 +67,19 @@ const userSchema = new mongoose.Schema({
   },
   membershipType: {
     type: String
+  },
+  resetOTP: {
+    type: String
+  },
+  resetOTPExpiry: {
+    type: Date
   }
 });
 
 userSchema.methods.getJwtToken = function () {
   const token = jwt.sign(
     { userId: this._id },
-    "Prit@2006",
+    process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
   return token;

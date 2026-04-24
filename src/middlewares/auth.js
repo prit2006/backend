@@ -8,7 +8,7 @@ const userAuth = async (req, res, next) => {
         if (!token) {
             return res.status(401).send("Please Login!");
         }
-        const decoded = await jwt.verify(token, "Prit@2006");
+        const decoded = await jwt.verify(token, process.env.JWT_SECRET);
         const _id = decoded.userId;
         const user = await User.findById(_id);
         if (!user) {
@@ -29,7 +29,7 @@ const adminAuth = async (req, res, next) => {
         if (!token) {
             return res.status(401).send("Please Login!");
         }
-        const decoded = await jwt.verify(token, "Prit@2006");
+        const decoded = await jwt.verify(token, process.env.JWT_SECRET);
         const _id = decoded.userId;
         const user = await User.findById(_id);
         if (!user) {
